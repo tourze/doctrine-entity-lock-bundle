@@ -3,9 +3,11 @@
 namespace Tourze\DoctrineEntityLockBundle\Service;
 
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autoconfigure;
 use Tourze\LockServiceBundle\Model\LockEntity;
 use Tourze\LockServiceBundle\Service\LockService;
 
+#[Autoconfigure(public: true)]
 class EntityLockService
 {
     public function __construct(
