@@ -1,18 +1,19 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tourze\DoctrineEntityLockBundle\Tests;
 
-use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Tourze\DoctrineEntityLockBundle\DoctrineEntityLockBundle;
+use Tourze\PHPUnitSymfonyKernelTest\AbstractBundleTestCase;
 
-class DoctrineEntityLockBundleTest extends TestCase
+/**
+ * @internal
+ */
+#[CoversClass(DoctrineEntityLockBundle::class)]
+#[RunTestsInSeparateProcesses]
+final class DoctrineEntityLockBundleTest extends AbstractBundleTestCase
 {
-    /**
-     * 测试Bundle基本实例化
-     */
-    public function testBundleInstantiation(): void
-    {
-        $bundle = new DoctrineEntityLockBundle();
-        $this->assertInstanceOf(DoctrineEntityLockBundle::class, $bundle, 'Bundle应该能够正确实例化');
-    }
 }

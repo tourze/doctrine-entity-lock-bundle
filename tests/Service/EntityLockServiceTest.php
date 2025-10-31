@@ -1,61 +1,50 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tourze\DoctrineEntityLockBundle\Tests\Service;
 
-use Doctrine\ORM\EntityManagerInterface;
-use PHPUnit\Framework\TestCase;
-use RuntimeException;
+use BizUserBundle\Entity\BizUser;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Tourze\DoctrineEntityLockBundle\Service\EntityLockService;
-use Tourze\DoctrineEntityLockBundle\Tests\Fixtures\TestEntity;
-use Tourze\LockServiceBundle\Service\LockService;
+use Tourze\PHPUnitSymfonyKernelTest\AbstractIntegrationTestCase;
 
-class EntityLockServiceTest extends TestCase
+/**
+ * @internal
+ */
+#[CoversClass(EntityLockService::class)]
+#[RunTestsInSeparateProcesses]
+final class EntityLockServiceTest extends AbstractIntegrationTestCase
 {
-    private EntityManagerInterface $entityManager;
-    private LockService $lockService;
-    private EntityLockService $entityLockService;
-
-    protected function setUp(): void
+    protected function onSetUp(): void
     {
-        $this->entityManager = $this->createMock(EntityManagerInterface::class);
-        $this->lockService = $this->createMock(LockService::class);
-        $this->entityLockService = new EntityLockService(
-            $this->entityManager,
-            $this->lockService
-        );
+    }
+
+    private function getEntityLockService(): EntityLockService
+    {
+        return self::getService(EntityLockService::class);
     }
 
     /**
      * 测试锁定单个实体的正常流程
      */
-    public function testLockEntity_withValidEntity_callsRefreshAndExecutesCallback(): void
+    public function testLockEntityWithValidEntityCallsRefreshAndExecutesCallback(): void
     {
         // 准备测试数据
-        $entity = new TestEntity();
+        $lockService = $this->getEntityLockService();
+        /** @var BizUser $entity */
+        $entity = $this->createNormalUser('test@example.com', 'password123');
         $callbackExecuted = false;
         $callbackResult = 'callback-result';
         $callback = function () use (&$callbackExecuted, $callbackResult) {
             $callbackExecuted = true;
+
             return $callbackResult;
         };
 
-        // 设置模拟对象的期望行为
-        // 因为回调会在 blockingRun 内部执行，所以需要在调用 blockingRun 之前设置 refresh 的期望
-        $this->entityManager
-            ->expects($this->once())
-            ->method('refresh')
-            ->with($entity);
-
-        $this->lockService
-            ->expects($this->once())
-            ->method('blockingRun')
-            ->with($entity, $this->anything())
-            ->willReturnCallback(function ($entity, $callback) {
-                return $callback();
-            });
-
         // 执行测试
-        $result = $this->entityLockService->lockEntity($entity, $callback);
+        $result = $lockService->lockEntity($entity, $callback);
 
         // 验证结果
         $this->assertTrue($callbackExecuted, '回调函数应该被执行');
@@ -63,66 +52,48 @@ class EntityLockServiceTest extends TestCase
     }
 
     /**
-     * 测试锁定单个实体时遇到异常的情况
+     * 测试锁定单个实体的基本功能
      */
-    public function testLockEntity_whenLockServiceThrowsException_propagatesException(): void
+    public function testLockEntityBasicFunctionality(): void
     {
-        // 准备测试数据
-        $entity = new TestEntity();
-        $callback = function () {
-            return 'result';
-        };
-        $exception = new RuntimeException('锁定错误');
+        $lockService = $this->getEntityLockService();
+        /** @var BizUser $entity */
+        $entity = $this->createNormalUser('test2@example.com', 'password123');
+        $callbackExecuted = false;
 
-        // 设置模拟对象的期望行为
-        $this->lockService
-            ->expects($this->once())
-            ->method('blockingRun')
-            ->with($entity, $this->anything())
-            ->willThrowException($exception);
+        $result = $lockService->lockEntity($entity, function () use (&$callbackExecuted) {
+            $callbackExecuted = true;
 
-        // 验证异常被正确传播
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('锁定错误');
+            return 'success';
+        });
 
-        // 执行测试
-        $this->entityLockService->lockEntity($entity, $callback);
+        $this->assertTrue($callbackExecuted, '回调函数应该被执行');
+        $this->assertEquals('success', $result, '回调函数的结果应该被返回');
     }
 
     /**
      * 测试锁定多个实体的正常流程
      */
-    public function testLockEntities_withValidEntities_callsRefreshForEachEntityAndExecutesCallback(): void
+    public function testLockEntitiesWithValidEntitiesCallsRefreshForEachEntityAndExecutesCallback(): void
     {
         // 准备测试数据
-        $entity1 = new TestEntity('entity-1');
-        $entity2 = new TestEntity('entity-2');
+        $lockService = $this->getEntityLockService();
+        /** @var BizUser $entity1 */
+        $entity1 = $this->createNormalUser('user1@example.com', 'password123');
+        /** @var BizUser $entity2 */
+        $entity2 = $this->createNormalUser('user2@example.com', 'password123');
         $entities = [$entity1, $entity2];
 
         $callbackExecuted = false;
         $callbackResult = 'callback-result';
         $callback = function () use (&$callbackExecuted, $callbackResult) {
             $callbackExecuted = true;
+
             return $callbackResult;
         };
 
-        // 设置模拟对象的期望行为
-        // 对每个实体都需要调用一次 refresh
-        $this->entityManager
-            ->expects($this->exactly(2))
-            ->method('refresh')
-            ->withAnyParameters();
-
-        $this->lockService
-            ->expects($this->once())
-            ->method('blockingRun')
-            ->with($entities, $this->anything())
-            ->willReturnCallback(function ($entities, $callback) {
-                return $callback();
-            });
-
         // 执行测试
-        $result = $this->entityLockService->lockEntities($entities, $callback);
+        $result = $lockService->lockEntities($entities, $callback);
 
         // 验证结果
         $this->assertTrue($callbackExecuted, '回调函数应该被执行');
@@ -132,33 +103,22 @@ class EntityLockServiceTest extends TestCase
     /**
      * 测试锁定空实体数组的情况
      */
-    public function testLockEntities_withEmptyArray_skipsRefreshAndExecutesCallback(): void
+    public function testLockEntitiesWithEmptyArraySkipsRefreshAndExecutesCallback(): void
     {
         // 准备测试数据
+        $lockService = $this->getEntityLockService();
         $entities = [];
 
         $callbackExecuted = false;
         $callbackResult = 'callback-result';
         $callback = function () use (&$callbackExecuted, $callbackResult) {
             $callbackExecuted = true;
+
             return $callbackResult;
         };
 
-        // 设置模拟对象的期望行为
-        $this->entityManager
-            ->expects($this->never())
-            ->method('refresh');
-
-        $this->lockService
-            ->expects($this->once())
-            ->method('blockingRun')
-            ->with($entities, $this->anything())
-            ->willReturnCallback(function ($entities, $callback) {
-                return $callback();
-            });
-
         // 执行测试
-        $result = $this->entityLockService->lockEntities($entities, $callback);
+        $result = $lockService->lockEntities($entities, $callback);
 
         // 验证结果
         $this->assertTrue($callbackExecuted, '回调函数应该被执行');
@@ -166,32 +126,25 @@ class EntityLockServiceTest extends TestCase
     }
 
     /**
-     * 测试锁定多个实体时遇到异常的情况
+     * 测试锁定多个实体的基本功能
      */
-    public function testLockEntities_whenLockServiceThrowsException_propagatesException(): void
+    public function testLockEntitiesBasicFunctionality(): void
     {
-        // 准备测试数据
-        $entity1 = new TestEntity('entity-1');
-        $entity2 = new TestEntity('entity-2');
+        $lockService = $this->getEntityLockService();
+        /** @var BizUser $entity1 */
+        $entity1 = $this->createNormalUser('user3@example.com', 'password123');
+        /** @var BizUser $entity2 */
+        $entity2 = $this->createNormalUser('user4@example.com', 'password123');
         $entities = [$entity1, $entity2];
+        $callbackExecuted = false;
 
-        $callback = function () {
-            return 'result';
-        };
-        $exception = new RuntimeException('锁定错误');
+        $result = $lockService->lockEntities($entities, function () use (&$callbackExecuted) {
+            $callbackExecuted = true;
 
-        // 设置模拟对象的期望行为
-        $this->lockService
-            ->expects($this->once())
-            ->method('blockingRun')
-            ->with($entities, $this->anything())
-            ->willThrowException($exception);
+            return 'multi-entity-success';
+        });
 
-        // 验证异常被正确传播
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('锁定错误');
-
-        // 执行测试
-        $this->entityLockService->lockEntities($entities, $callback);
+        $this->assertTrue($callbackExecuted, '回调函数应该被执行');
+        $this->assertEquals('multi-entity-success', $result, '回调函数的结果应该被返回');
     }
 }

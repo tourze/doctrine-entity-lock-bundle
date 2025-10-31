@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tourze\DoctrineEntityLockBundle\Service;
 
 use Doctrine\ORM\EntityManagerInterface;
@@ -8,13 +10,12 @@ use Tourze\LockServiceBundle\Model\LockEntity;
 use Tourze\LockServiceBundle\Service\LockService;
 
 #[Autoconfigure(public: true)]
-class EntityLockService
+readonly class EntityLockService
 {
     public function __construct(
-        private readonly EntityManagerInterface $entityManager,
-        private readonly LockService $lockService,
-    )
-    {
+        private EntityManagerInterface $entityManager,
+        private LockService $lockService,
+    ) {
     }
 
     /**
