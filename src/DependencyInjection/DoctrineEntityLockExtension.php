@@ -6,7 +6,7 @@ namespace Tourze\DoctrineEntityLockBundle\DependencyInjection;
 
 use Tourze\SymfonyDependencyServiceLoader\AutoExtension;
 
-class DoctrineEntityLockExtension extends AutoExtension
+final class DoctrineEntityLockExtension extends AutoExtension
 {
     protected function getConfigDir(): string
     {
